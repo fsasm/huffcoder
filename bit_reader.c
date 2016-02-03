@@ -46,14 +46,14 @@ bool bit_reader_next_bit(struct bit_reader *reader, uint8_t *bit)
 				return false;
 		}
 
-		*bit = data & 0x01;
-		reader->buffer = data >> 1;
+		*bit = (data & 0x80) >> 7;
+		reader->buffer = data << 1;
 		reader->bit_pos = 7;
 		return true;
 	}
 
-	*bit = reader->buffer & 0x01;
-	reader->buffer >>= 1;
+	*bit = (reader->buffer & 0x80) >> 7;
+	reader->buffer <<= 1;
 	reader->bit_pos--;
 	return true;
 }
