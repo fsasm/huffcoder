@@ -5,6 +5,9 @@
  * @brief Module to read bitwise from a file.
  */
 
+#ifndef BIT_READER_H
+#define BIT_READER_H
+
 #include <stdio.h>
 #include <stdint.h>
 #include <stdbool.h>
@@ -15,4 +18,6 @@ struct bit_reader *bit_reader_create(FILE *in);
 void bit_reader_destroy(struct bit_reader *reader);
 bool bit_reader_next_bit(struct bit_reader *reader, uint8_t *bit);
 bool bit_reader_next_bits(struct bit_reader *reader, uint16_t *bits, uint8_t num);
+
+#endif
 
