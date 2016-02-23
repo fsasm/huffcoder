@@ -18,7 +18,7 @@ static const char *prog_name = "hufdec";
 
 void usage(void)
 {
-	fprintf(stderr, "USAGE: %s FILE_IN FILE_OUT\n", prog_name);
+	fprintf(stderr, "USAGE: %s FILE_IN [FILE_OUT]\n", prog_name);
 	exit(EXIT_FAILURE);
 }
 
@@ -62,21 +62,33 @@ void decode(FILE *in, FILE *out)
 	}
 
 	/* how many bytes for the output or how many symbols to read */
-	uint8_t tmp[sizeof(uint32_t)];
-	if (fread(tmp, sizeof(uint32_t), 1, in) != 1) {
+	uint8_t tmp[4];
+	if (fread(tmp, 4, 1, in) != 1) {
 		fprintf(stderr, "Couldn't read number of data\n");
 		exit(EXIT_FAILURE);
 	}
 
 	uint32_t num_sym = (tmp[0] << 24) | (tmp[1] << 16) | (tmp[2] << 8) | tmp[3];
 
-	struct huff_dec *dec = huff_gen_dec(&header[5], symbols);
+	struct huff_dec dec;
+	if (!huff_gen_dec(&header[5], symbols, &dec)) {
+		fprintf(stderr, "Couldn't create decoder\n");
+		exit(EXIT_FAILURE);
+	}
 	struct bit_reader *reader = bit_reader_create(in);
 
-	huff_decode_all(dec, reader, out, num_sym);
+	if (reader == NULL) {
+		fprintf(stderr, "Couldn't create bit reader\n");
+		exit(EXIT_FAILURE);
+	}
+
+	if (!huff_decode_file(&dec, num_sym, reader, out)) {
+		fprintf(stderr, "Error while decoding\n");
+		exit(EXIT_FAILURE);
+	}
 
 	bit_reader_destroy(reader);
-	huff_destroy(dec);
+	huff_destroy(&dec);
 }
 
 int main(int argc, char *argv[])
@@ -86,7 +98,7 @@ int main(int argc, char *argv[])
 	if (argc > 1)
 		prog_name = argv[0];
 	
-	if (argc != 3)
+	if (argc != 3 && argc != 2)
 		usage();
 	
 	FILE *in = fopen(argv[1], "rb");
@@ -95,14 +107,18 @@ int main(int argc, char *argv[])
 		return EXIT_FAILURE;
 	}
 
-	FILE *out = fopen(argv[2], "wb");
-	if (out == NULL) {
-		perror("Couldn't open output file");
-		return EXIT_FAILURE;
+	FILE *out;
+	if (argc == 3) {
+		out = fopen(argv[2], "wb");
+		if (out == NULL) {
+			perror("Couldn't open output file");
+			return EXIT_FAILURE;
+		}
+	} else {
+		out = stdout;
 	}
 
 	decode(in, out);
-
 
 	fclose(in);
 	fclose(out);
