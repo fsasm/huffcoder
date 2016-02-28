@@ -17,14 +17,17 @@ DEBUG = -g -O0 -fsanitize=address
 
 .PHONY: all clean debug
 
-all: huffdec
+all: huffdec huffenc
 
 debug: CFLAGS+=$(DEBUG)
 debug: all
 
 clean:
-	rm -f hufdec
+	rm -f huffdec huffenc
 
 huffdec: decoder.c bit_reader.c huff_dec.c
+	$(CC) $(FLAGS) $(CFLAGS) $(LFLAGS) -o $@ $^
+
+huffenc: encoder.c bit_writer.c huff_enc.c
 	$(CC) $(FLAGS) $(CFLAGS) $(LFLAGS) -o $@ $^
 
