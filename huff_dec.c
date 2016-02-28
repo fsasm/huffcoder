@@ -147,10 +147,12 @@ bool huff_decode_file(const struct huff_dec * restrict decoder, size_t num_sym,
 	uint16_t *table = decoder->entries;
 
 	/* FIXME special case with less than max_bits in the data stream. */
-	if (!bit_reader_next_bits(reader, &code, max_bits)) {
+	/* FIXME handle EOF correctly */
+	bit_reader_next_bits(reader, &code, max_bits);
+	/*
 		fprintf(stderr, "Error while reading input\n");
 		return false;
-	}
+	}*/
 
 	for (size_t i = 0; i < num_sym; i++) {
 		code &= mask;
@@ -160,7 +162,7 @@ bool huff_decode_file(const struct huff_dec * restrict decoder, size_t num_sym,
 
 		assert(length != 0);
 		assert(length <= max_bits);
-
+		
 		if (fwrite(&symbol, 1, 1, out) != 1) {
 			fprintf(stderr, "Error while writing output symbols\n");
 			return false;
@@ -170,10 +172,10 @@ bool huff_decode_file(const struct huff_dec * restrict decoder, size_t num_sym,
 			break;
 
 		uint16_t tmp = 0;
-		if (!bit_reader_next_bits(reader, &tmp, length)) {
+		bit_reader_next_bits(reader, &tmp, length);/*
 			fprintf(stderr, "Error while reading input\n");
 			return false;
-		}
+		}*/
 		
 		code = (code << length) | tmp;
 	}

@@ -44,6 +44,8 @@ bool bit_reader_next_bit(struct bit_reader *reader, uint8_t *bit)
 
 			if (data != 0)
 				return false;
+
+			data = 0xFF;
 		}
 
 		*bit = (data & 0x80) >> 7;
@@ -64,7 +66,7 @@ bool bit_reader_next_bits(struct bit_reader *reader, uint16_t *bits, uint8_t num
 	assert(bits   != NULL);
 	assert(num <= 16);
 
-	uint8_t tmp = 0;
+	uint16_t tmp = 0;
 
 	for (int i = 0; i < num; i++) {
 		uint8_t bit;
