@@ -64,6 +64,7 @@ bool huff_gen_enc(const uint32_t freq[restrict 256],
 
 	/* generate huffman code lengths */
 	gen_code_lengths(num_sym, freq, codes);
+	//limit_length(num_sym, codes);
 
 	/* generate canonical huffman codes */
 	gen_canonical_codes(num_sym, codes, info);
@@ -117,31 +118,33 @@ static void get_min_nodes(uint16_t n, const struct node nodes[restrict],
 	assert(min2_index != NULL);
 
 	uint16_t index1 = 0;
-	uint16_t index2 = 1;
+	uint16_t index2 = 0;
 
 	uint32_t count1 = nodes[0].count;
-	uint32_t count2 = nodes[1].count;
-
-	for (uint16_t i = 2; i < n; i++) {
+	for (uint16_t i = 1; i < n; i++) {
 		if (count1 > nodes[i].count) {
-			if (count1 > count2) {
-				index2 = index1;
-				count2 = count1;
-			}
-
-			index1 = i;
 			count1 = nodes[i].count;
-			continue;
+			index1 = i;
 		}
-
-		if (count2 > nodes[i].count) {
-			index2 = i;
-			count2 = nodes[i].count;
-		}
-
-		assert(index1 != index2);
+	}
+	
+	uint32_t count2;
+	if (index1 == 0) {
+		count2 = nodes[1].count;
+		index2 = 1;
+	} else {
+		count2 = nodes[0].count;
+		index2 = 0;
 	}
 
+	for (uint16_t i = 1; i < n; i++) {
+		if (count2 > nodes[i].count && i != index1) {
+			count2 = nodes[i].count;
+			index2 = i;
+		}
+	}
+
+	assert(index1 != index2);
 	assert(index1 < n);
 	assert(index2 < n);
 
@@ -176,14 +179,16 @@ static bool gen_code_lengths(uint16_t num_sym, const uint32_t freq[restrict],
 	assert(freq  != NULL);
 	assert(codes != NULL);
 
-	struct node *nodes = malloc((2 * num_sym) * sizeof(struct node));
+	struct node *nodes = malloc((2 * num_sym - 1) * sizeof(struct node));
 	size_t node_index = 0;
 	uint32_t freq_sum = 0;
+	
 	for (int i = 0; i < 256; i++) {
 		if (freq[i] == 0)
 			continue;
 
 		freq_sum += freq[i];
+
 		codes[node_index].symbol = i;
 		nodes[node_index] = (struct node) {
 			.left = NULL,
@@ -197,13 +202,15 @@ static bool gen_code_lengths(uint16_t num_sym, const uint32_t freq[restrict],
 	assert(0 < node_index && node_index <= 256);
 
 	uint16_t border = num_sym;
-	uint16_t last   = 2 * num_sym - 1;
+	uint16_t last   = 2 * num_sym - 2;
 
 	while (border > 2) {
 		uint16_t min1_index;
 		uint16_t min2_index;
 
 		get_min_nodes(border, nodes, &min1_index, &min2_index);
+		assert(min1_index < border && min2_index < border);
+		assert(nodes[min1_index].count <= nodes[min2_index].count);
 
 		nodes[last]     = nodes[min2_index];
 		nodes[last - 1] = nodes[min1_index];
@@ -218,6 +225,14 @@ static bool gen_code_lengths(uint16_t num_sym, const uint32_t freq[restrict],
 		border--;
 		last -= 2;
 	}
+
+	if (nodes[0].count > nodes[1].count) {
+		struct node tmp = nodes[1];
+		nodes[1] = nodes[0];
+		nodes[0] = tmp;
+	}
+
+	assert(nodes[0].count <= nodes[1].count);
 
 	struct node root = (struct node) {
 		.left  = &nodes[0],
@@ -244,14 +259,13 @@ static void gen_canonical_codes(uint16_t num_codes,
 	for (int i = 0; i < 16; i++) {
 		uint8_t num_codes_len = 0;
 		for (int j = 0; j < num_codes; j++) {
+			assert(codes[j].code_len <= 16);
 			if (codes[j].code_len != i + 1)
 				continue;
 
 			codes[j].code = code;
 			code++;
 			num_codes_len++;
-
-			printf("Symbol %2X: %4X - %u\n", codes[j].symbol, codes[j].code, codes[j].code_len);
 		}
 
 		code <<= 1;
