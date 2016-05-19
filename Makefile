@@ -13,7 +13,7 @@ WARNINGS = -Wall -Wextra -Wundef -Wshadow -Wpointer-arith -Wcast-align \
 -Wstrict-prototypes -Wwrite-strings -Waggregate-return
 CFLAGS := -std=c99 -pedantic $(WARNINGS) -O2 $(CFLAGS)
 LFLAGS := $(LFLAGS)
-DEBUG = -g -O0 -fsanitize=address
+DEBUG = -g -Og -fsanitize=address -fsanitize=undefined
 
 .PHONY: all clean debug
 
