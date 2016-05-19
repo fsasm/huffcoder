@@ -35,6 +35,8 @@ static bool gen_code_lengths(uint16_t num_sym, const uint32_t freq[restrict],
 static void gen_canonical_codes(uint16_t num_codes, 
 								struct huff_code codes[restrict], 
 								struct huff_enc_info * restrict info);
+static bool limit_length(uint16_t num_codes, struct huff_code codes[restrict],
+						 uint8_t limit);
 
 bool huff_gen_enc(const uint32_t freq[restrict 256],
 				  struct huff_enc * restrict encoder, 
@@ -64,7 +66,7 @@ bool huff_gen_enc(const uint32_t freq[restrict 256],
 
 	/* generate huffman code lengths */
 	gen_code_lengths(num_sym, freq, codes);
-	//limit_length(num_sym, codes);
+	limit_length(num_sym, codes, 16);
 
 	/* generate canonical huffman codes */
 	gen_canonical_codes(num_sym, codes, info);
@@ -156,9 +158,6 @@ static void set_len(const struct node *node, uint8_t depth)
 {
 	assert(node != NULL);
 
-	if (depth > 16) {
-		fprintf(stderr, "Warning: Code length over 16!\n");
-	}
 	if (node->left == NULL && node->right == NULL) {
 		assert(node->code != NULL);
 		node->code->code_len = depth;
@@ -245,6 +244,68 @@ static bool gen_code_lengths(uint16_t num_sym, const uint32_t freq[restrict],
 
 	set_len(&root, 0);
 	free(nodes);
+
+	return true;
+}
+
+static int len_cmp(const void *left, const void *right)
+{
+	return ((const struct huff_code *)left)->code_len -
+		((const struct huff_code *)right)->code_len;
+}
+
+static bool limit_length(uint16_t num_codes, struct huff_code codes[restrict],
+						 uint8_t limit)
+{
+	assert(num_codes > 0);
+	assert(codes != NULL);
+	assert(limit > 1);
+
+	// sort by code_len
+	qsort(codes, num_codes, sizeof(struct huff_code), len_cmp);
+
+	const uint32_t n = 1 << limit;
+
+	uint32_t kraft_sum = 0;
+
+	for (uint16_t i = 0; i < num_codes; i++) {
+		if (codes[i].code_len > limit)
+			codes[i].code_len = limit;
+		kraft_sum += n >> codes[i].code_len;
+	}
+
+	if (kraft_sum > n) {
+		for (uint16_t i = 0; i < num_codes; i++) {
+			uint16_t index = num_codes - i - 1;
+			if (codes[index].code_len == limit)
+				continue;
+
+			if (kraft_sum <= n)
+				break;
+			
+			codes[index].code_len++;
+			kraft_sum -= n >> codes[index].code_len;
+		}
+	}
+
+	if (kraft_sum < n) {
+		uint32_t kraft_diff = n - kraft_sum;
+
+		for (uint16_t i = 0; i < num_codes; i++) {
+			if (codes[i].code_len == 1)
+				continue;
+
+			if (n >> (codes[i].code_len) > kraft_diff) 
+				continue;
+
+			if (kraft_sum == n || kraft_diff == 0)
+				break;
+			
+			kraft_sum += n >> codes[i].code_len;
+			kraft_diff -= n >> codes[i].code_len;
+			codes[i].code_len--;
+		}
+	}
 
 	return true;
 }

@@ -35,7 +35,7 @@ bool huff_gen_dec(uint8_t code_len[restrict 16], uint8_t symbols[restrict],
 	assert(0 < max_bits && max_bits <= 16);
 	assert(0 < min_bits && min_bits <= 16);
 
-	uint16_t num_entries = 1 << max_bits;
+	uint32_t num_entries = 1 << max_bits;
 	assert(num_entries != 0);
 
 	decoder->max_bits = max_bits;
@@ -66,6 +66,9 @@ bool huff_gen_dec(uint8_t code_len[restrict 16], uint8_t symbols[restrict],
 		}
 	}
 
+	/* if the kraft sum is less than 1 then index is less than num_entries
+	 * this isn't really an error, there are just some checks in the decoding 
+	 * missing. */
 	if (index != num_entries) {
 		fprintf(stderr, "Invalid decode header. Missing entries in decode table\n");
 		free(decoder->entries);
@@ -141,14 +144,16 @@ bool huff_decode_file(const struct huff_dec * restrict decoder, size_t num_sym,
 	   to push back bits in bit_reader and extend decoding to decode at any bit
 	   position. */
 	
-	uint16_t code;
+	uint32_t code;
 	uint8_t max_bits = decoder->max_bits;
 	const uint16_t mask = (1 << max_bits) - 1;
 	uint16_t *table = decoder->entries;
 
 	/* FIXME special case with less than max_bits in the data stream. */
 	/* FIXME handle EOF correctly */
-	bit_reader_next_bits(reader, &code, max_bits);
+	uint16_t code16;
+	bit_reader_next_bits(reader, &code16, max_bits);
+	code = code16;
 	/*
 		fprintf(stderr, "Error while reading input\n");
 		return false;
@@ -177,6 +182,7 @@ bool huff_decode_file(const struct huff_dec * restrict decoder, size_t num_sym,
 			return false;
 		}*/
 		
+		/* FIXME this can overflow when code is uint16_t */
 		code = (code << length) | tmp;
 	}
 
